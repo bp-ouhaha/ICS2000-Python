@@ -56,24 +56,37 @@ class Hub:
                   "password_hash": self._password, "home_id": self._homeId}
         resp = requests.get(url, params=params)
         self._devices = []
+        devices = [item.value for item in DeviceType]
         for device in json.loads(resp.text):
             decrypted = json.loads(decrypt(device["data"], self.aes))
             if "module" in decrypted and "info" in decrypted["module"]:
                 decrypted = decrypted["module"]
+                #print("found device type %s" % decrypted)
                 name = decrypted["name"]
                 entityid = decrypted["id"]
 
-                devices = [item.value for item in DeviceType]
                 if decrypted["device"] not in devices:
                     self._devices.append(Device(name, entityid, self))
-                    return
-                dev = DeviceType(decrypted["device"])
-                if dev == DeviceType.LAMP:
-                    self._devices.append(Device(name, entityid, self))
-                if dev == DeviceType.DIMMER:
-                    self._devices.append(Dimmer(name, entityid, self))
-                if dev == DeviceType.OPENCLOSE:
-                    self._devices.append(Device(name, entityid, self))
+                else:
+                  dev = DeviceType(decrypted["device"])
+                  if   dev == DeviceType.SWITCH:
+                      self._devices.append(Device(name, entityid, self))
+                  elif dev == DeviceType.DIMMER:
+                      self._devices.append(Dimmer(name, entityid, self))
+                  elif dev == DeviceType.ACTUATOR:
+                      self._devices.append(Device(name, entityid, self))
+                  else:
+                      print("unknown type device, setting up as standard Device...")
+                      self._devices.append(Device(name, entityid, self))
+            elif "module" in decrypted and "name" in decrypted["module"]:
+                decrypted = decrypted["module"]
+                print("found device type %s (without info)" % decrypted)
+                name = decrypted["name"]
+                entityid = decrypted["id"]
+                if decrypted["device"] in devices:
+                  dev = DeviceType(decrypted["device"])
+                  if dev == DeviceType.ENERGY_MODULE:
+                      self._devices.append(Device(name, entityid, self))
 
     def devices(self):
         return self._devices
@@ -123,6 +136,27 @@ class Hub:
                 return dcrpt["module"]["functions"]
         return []
 
+    def get_device_check(self, entity) -> []:
+        url = base_url + "/entity.php"
+        params = {"action": "check", "email": self._email, "mac": self.mac.replace(":", ""),
+                  "password_hash": self._password, "entity_id": str(entity)}
+        resp = requests.get(url, params=params)
+        arr = json.loads(resp.text)
+        if len(arr) == 4:
+            # 0: data-version
+            # 1: data
+            # 2: status-version
+            # 3: status
+            try:
+              dcrpt = json.loads(decrypt(arr[3], self.aes))
+              if "module" in dcrpt and "functions" in dcrpt["module"]:
+                  return dcrpt["module"]["functions"]
+            except TypeError:
+              pass
+            except json.decoder.JSONDecodeError:
+              pass
+        return []
+
     def getlampstatus(self, entity) -> Optional[bool]:
         status = self.get_device_status(entity)
         if len(status) >= 1:
@@ -142,9 +176,59 @@ class Hub:
 
 
 class DeviceType(enum.Enum):
-    LAMP = 1
+    SWITCH = 1
     DIMMER = 2
-    OPENCLOSE = 3
+    ACTUATOR = 3
+    MOTION_SENSOR = 4
+    CONTACT_SENSOR = 5
+    DOORBELL_ACDB_7000A = 6
+    WALL_CONTROL_1_CHANNEL = 7
+    WALL_CONTROL_2_CHANNEL = 8
+    REMOTE_CONTROL_1_CHANNEL = 9
+    REMOTE_CONTROL_2_CHANNEL = 10
+    REMOTE_CONTROL_3_CHANNEL = 11
+    REMOTE_CONTROL_16_CHANNEL = 12
+    REMOTE_CONTROL_AYCT_202 = 13
+    CHIME = 14
+    DUSK_SENSOR = 15
+    ARC_REMOTE = 16
+    ARC_CONTACT_SENSOR = 17
+    ARC_MOTION_SENSOR = 18
+    ARC_SMOKE_SENSOR = 19
+    ARC_SIREN = 20
+    DOORBELL_ACDB_7000B = 21
+    AWMT = 22
+    SOMFY_ACTUATOR = 23
+    LIGHT = 24
+    WALL_SWITCH_AGST_8800 = 25
+    WALL_SWITCH_AGST_8802 = 26
+    BREL_ACTUATOR = 27
+    CONTACT_SENSOR_2 = 28
+    ARC_KEYCHAIN_REMOTE = 29
+    ARC_ACTION_BUTTON = 30
+    ARC_ROTARY_DIMMER = 31
+    ZIGBEE_UNKNOWN_DEVICE = 32
+    ZIGBEE_SWITCH = 33
+    ZIGBEE_DIMMER = 34
+    ZIGBEE_RGB = 35
+    ZIGBEE_TUNABLE = 36
+    ZIGBEE_MULTI_PURPOSE_SENSOR = 37
+    ZIGBEE_LOCK = 38
+    ZIGBEE_LIGHT_LINK_REMOTE = 39
+    ZIGBEE_LIGHT = 40
+    ZIGBEE_SOCKET = 41
+    ZIGBEE_LEAKAGE_SENSOR = 42
+    ZIGBEE_SMOKE_SENSOR = 43
+    ZIGBEE_CARBON_MONOXIDE_SENSOR = 44
+    ZIGBEE_TEMPERATURE_AND_HUMIDITY_SENSOR = 45
+    ZIGBEE_LIGHT_GROUP = 46
+    ZIGBEE_FIREANGEL_SENSOR = 47
+    CAMERA_MODULE = 48
+    LOCATION_MODULE = 49
+    SYSTEM_MODULE = 50
+    SECURITY_MODULE = 53
+    ENERGY_MODULE = 238
+    WEATHER_MODULE = 244
 
 
 def get_hub(mac, email, password) -> Optional[Hub]:
