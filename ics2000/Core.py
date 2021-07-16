@@ -75,9 +75,11 @@ class Hub:
                       self._devices.append(Dimmer(name, entityid, self))
                   elif dev == DeviceType.ACTUATOR:
                       self._devices.append(Device(name, entityid, self))
-                  else:
-                      print("unknown type device, setting up as standard Device...")
+                  elif dev == DeviceType.ZIGBEE_SOCKET:
                       self._devices.append(Device(name, entityid, self))
+                  #else:
+                  #    print("unknown type device, setting up as standard Device...")
+                  #    self._devices.append(Device(name, entityid, self))
             elif "module" in decrypted and "name" in decrypted["module"]:
                 decrypted = decrypted["module"]
                 print("found device type %s (without info)" % decrypted)
@@ -121,6 +123,10 @@ class Hub:
 
     def zigbee_switch(self, entity, power):
         cmd = self.simplecmd(entity, 3, (str(1) if power else str(0)))
+        self.sendcommand(cmd.getcommand())
+
+    def zigbee_socket(self, entity, power):
+        cmd = self.simplecmd(entity, 3, 1 if power else 0)
         self.sendcommand(cmd.getcommand())
 
     def get_device_status(self, entity) -> []:
